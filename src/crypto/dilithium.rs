@@ -130,7 +130,8 @@ impl DilithiumKeyPair {
         let mut seed = [0u8; DILITHIUM_SECRET_KEY_SIZE];
         rng.fill_bytes(&mut seed);
 
-        let signing_key = SigningKey::<MlDsa65>::from_seed(&seed);
+        let seed_arr = ml_dsa::hybrid_array::Array::from(seed);
+        let signing_key = SigningKey::<MlDsa65>::from_seed(&seed_arr);
         let verifying_key: VerifyingKey<MlDsa65> = signing_key.verifying_key();
         let enc_vk = verifying_key.encode();
 
@@ -166,10 +167,20 @@ pub fn verify(
         });
     }
 
-    let enc_vk = EncodedVerifyingKey::<MlDsa65>::clone_from_slice(public_key.as_bytes());
+    let enc_vk = EncodedVerifyingKey::<MlDsa65>::try_from(public_key.as_bytes()).map_err(|_| {
+        DilithiumError::InvalidPublicKeyLength {
+            expected: DILITHIUM_PUBLIC_KEY_SIZE,
+            actual: public_key.as_bytes().len(),
+        }
+    })?;
     let vk = VerifyingKey::<MlDsa65>::decode(&enc_vk);
 
-    let enc_sig = EncodedSignature::<MlDsa65>::clone_from_slice(signature.as_bytes());
+    let enc_sig = EncodedSignature::<MlDsa65>::try_from(signature.as_bytes()).map_err(|_| {
+        DilithiumError::InvalidSignatureLength {
+            expected: DILITHIUM_SIGNATURE_SIZE,
+            actual: signature.as_bytes().len(),
+        }
+    })?;
     let sig = Signature::<MlDsa65>::decode(&enc_sig).ok_or(DilithiumError::VerificationFailed)?;
 
     vk.verify(message, &sig)

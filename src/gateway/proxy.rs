@@ -19,7 +19,7 @@ use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder as ServerConnBuilder;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::gateway::load_balancer::LoadBalancer;
 use crate::gateway::metrics::GatewayMetrics;
@@ -101,7 +101,7 @@ impl QuantumGateway {
 
     /// Handles a single incoming TCP client connection, performs TLS handshake, and serves HTTP
     async fn handle_connection(
-        &self,
+        self: Arc<Self>,
         stream: tokio::net::TcpStream,
         client_addr: SocketAddr,
     ) -> Result<(), anyhow::Error> {

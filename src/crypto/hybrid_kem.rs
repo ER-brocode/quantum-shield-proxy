@@ -223,7 +223,12 @@ impl HybridKeyPair {
         }
 
         // 2. ML-KEM-768 Decapsulation (FIPS 203)
-        let ct = Ciphertext::clone_from_slice(&ciphertext.mlkem_ciphertext);
+        let ct = Ciphertext::try_from(ciphertext.mlkem_ciphertext.as_slice()).map_err(|_| {
+            HybridCryptoError::InvalidCiphertextLength {
+                expected: MLKEM768_CIPHERTEXT_SIZE,
+                actual: ciphertext.mlkem_ciphertext.len(),
+            }
+        })?;
         let pq_ss = self.mlkem_decaps_key.decapsulate(&ct);
 
         // 3. Derive combined hybrid shared secret via HKDF-SHA256
