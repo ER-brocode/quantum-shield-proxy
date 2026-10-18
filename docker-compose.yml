@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  quantum-shield:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8443:8443"
+    environment:
+      - RUST_LOG=info
+    volumes:
+      - ./quantum-shield.yaml:/app/quantum-shield.yaml:ro
+    depends_on:
+      - upstream-service-1
+      - upstream-service-2
+    restart: unless-stopped
+
+  upstream-service-1:
+    image: hashicorp/http-echo:latest
+    command: ["-text=Hello from Protected Backend 1! QuantumShield Secured."]
+    ports:
+      - "8080:5678"
+
+  upstream-service-2:
+    image: hashicorp/http-echo:latest
+    command: ["-text=Hello from Protected Backend 2! QuantumShield Secured."]
+    ports:
+      - "8081:5678"

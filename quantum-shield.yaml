@@ -1,0 +1,31 @@
+# QuantumShield Reverse Proxy Configuration
+# Post-Quantum Cryptography (PQC) TLS 1.3 Reverse Gateway
+
+# Proxy Listener Address
+listen_addr: "0.0.0.0:8443"
+
+# Upstream Backend Pool
+backends:
+  - "127.0.0.1:8080"
+  - "127.0.0.1:8081"
+
+# Load Balancing Strategy: "round_robin" or "least_connections"
+balancing_strategy: "round_robin"
+
+# Strict PQC: Reject legacy classical-only TLS clients (require NIST FIPS 203 ML-KEM-768)
+strict_pqc: false
+
+# Automatic Self-Signed Certificate Generation (when cert_path is not specified)
+auto_generate_cert: true
+
+# Custom TLS Certificate Paths (optional)
+# cert_path: "/etc/quantum-shield/certs/fullchain.pem"
+# key_path: "/etc/quantum-shield/certs/privkey.pem"
+
+# Active Upstream Health Checks
+health_check_interval_secs: 10
+health_check_timeout_secs: 2
+
+# Security & Telemetry Header Injection
+inject_headers: true
+server_name: "QuantumShield-Gateway/1.0"
