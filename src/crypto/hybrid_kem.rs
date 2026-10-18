@@ -67,7 +67,10 @@ pub struct HybridPublicKey {
 
 impl HybridPublicKey {
     /// Creates a hybrid public key from separate components
-    pub fn new(x25519: [u8; X25519_PUBLIC_KEY_SIZE], mlkem: [u8; MLKEM768_ENCAPS_KEY_SIZE]) -> Self {
+    pub fn new(
+        x25519: [u8; X25519_PUBLIC_KEY_SIZE],
+        mlkem: [u8; MLKEM768_ENCAPS_KEY_SIZE],
+    ) -> Self {
         Self {
             x25519_public: x25519,
             mlkem_public: mlkem,
@@ -109,7 +112,10 @@ pub struct HybridCiphertext {
 }
 
 impl HybridCiphertext {
-    pub fn new(x25519: [u8; X25519_PUBLIC_KEY_SIZE], mlkem_ct: [u8; MLKEM768_CIPHERTEXT_SIZE]) -> Self {
+    pub fn new(
+        x25519: [u8; X25519_PUBLIC_KEY_SIZE],
+        mlkem_ct: [u8; MLKEM768_CIPHERTEXT_SIZE],
+    ) -> Self {
         Self {
             x25519_ephemeral: x25519,
             mlkem_ciphertext: mlkem_ct,
@@ -201,7 +207,10 @@ impl HybridKeyPair {
 
     /// Client-side decapsulation: consumes keypair, decapsulates peer's ciphertext,
     /// and derives the identical hybrid shared secret
-    pub fn decapsulate(self, ciphertext: &HybridCiphertext) -> Result<HybridSharedSecret, HybridCryptoError> {
+    pub fn decapsulate(
+        self,
+        ciphertext: &HybridCiphertext,
+    ) -> Result<HybridSharedSecret, HybridCryptoError> {
         // 1. Classical X25519 Diffie-Hellman
         let peer_x25519 = X25519PublicKey::from(ciphertext.x25519_ephemeral);
         let classical_ss = self.x25519_secret.diffie_hellman(&peer_x25519);
@@ -214,9 +223,8 @@ impl HybridKeyPair {
         }
 
         // 2. ML-KEM-768 Decapsulation (FIPS 203)
-        let ct_encoded = Ciphertext::<MlKem768Params>::from_bytes(
-            &ciphertext.mlkem_ciphertext.into()
-        );
+        let ct_encoded =
+            Ciphertext::<MlKem768Params>::from_bytes(&ciphertext.mlkem_ciphertext.into());
         let pq_ss = self.mlkem_decaps_key.decapsulate(&ct_encoded);
 
         // 3. Derive combined hybrid shared secret via HKDF-SHA256
@@ -227,7 +235,9 @@ impl HybridKeyPair {
 
 /// Server-side encapsulation: given client's hybrid public key, encapsulates a shared secret
 /// and returns both the ciphertext to transmit and the derived shared secret.
-pub fn encapsulate(peer_public: &HybridPublicKey) -> Result<(HybridCiphertext, HybridSharedSecret), HybridCryptoError> {
+pub fn encapsulate(
+    peer_public: &HybridPublicKey,
+) -> Result<(HybridCiphertext, HybridSharedSecret), HybridCryptoError> {
     let mut rng = OsRng;
 
     // 1. Classical X25519 ephemeral key generation and DH
@@ -244,11 +254,12 @@ pub fn encapsulate(peer_public: &HybridPublicKey) -> Result<(HybridCiphertext, H
 
     // 2. ML-KEM-768 Encapsulation (FIPS 203)
     let ek_encoded = Encoded::<ml_kem::EncapsulationKey<MlKem768Params>>::from_bytes(
-        &peer_public.mlkem_public.into()
+        &peer_public.mlkem_public.into(),
     );
     let ek = ml_kem::EncapsulationKey::<MlKem768Params>::from_bytes(&ek_encoded);
 
-    let (ct, pq_ss) = ek.encapsulate(&mut rng)
+    let (ct, pq_ss) = ek
+        .encapsulate(&mut rng)
         .map_err(|_| HybridCryptoError::EncapsulationFailed)?;
 
     let mut mlkem_ct_bytes = [0u8; MLKEM768_CIPHERTEXT_SIZE];
@@ -262,7 +273,10 @@ pub fn encapsulate(peer_public: &HybridPublicKey) -> Result<(HybridCiphertext, H
 }
 
 /// Derives a 32-byte final shared secret from classical and post-quantum secrets using HKDF-SHA256
-fn derive_hybrid_secret(classical: &[u8], pq: &[u8]) -> Result<[u8; HYBRID_SHARED_SECRET_SIZE], HybridCryptoError> {
+fn derive_hybrid_secret(
+    classical: &[u8],
+    pq: &[u8],
+) -> Result<[u8; HYBRID_SHARED_SECRET_SIZE], HybridCryptoError> {
     // IKM = classical_shared_secret || pq_shared_secret
     let mut ikm = Vec::with_capacity(classical.len() + pq.len());
     ikm.extend_from_slice(classical);
@@ -297,7 +311,8 @@ mod tests {
         assert_eq!(client_pub, parsed_pub);
 
         // Server encapsulates
-        let (ciphertext, server_ss) = encapsulate(&parsed_pub).expect("Encapsulation should succeed");
+        let (ciphertext, server_ss) =
+            encapsulate(&parsed_pub).expect("Encapsulation should succeed");
 
         // Wire ciphertext serialization check
         let ct_bytes = ciphertext.to_bytes();
@@ -306,7 +321,9 @@ mod tests {
         assert_eq!(ciphertext, parsed_ct);
 
         // Client decapsulates
-        let client_ss = client_keypair.decapsulate(&parsed_ct).expect("Decapsulation should succeed");
+        let client_ss = client_keypair
+            .decapsulate(&parsed_ct)
+            .expect("Decapsulation should succeed");
 
         // Shared secrets must match identically
         assert_eq!(server_ss.as_bytes(), client_ss.as_bytes());

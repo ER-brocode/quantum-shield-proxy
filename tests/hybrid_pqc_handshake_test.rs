@@ -22,15 +22,15 @@ use tokio_rustls::{TlsAcceptor, TlsConnector};
 
 use quantum_shield_proxy::crypto::dilithium::{self, DilithiumKeyPair};
 use quantum_shield_proxy::crypto::hybrid_kem::{
-    encapsulate, HybridCiphertext, HybridKeyPair, HybridPublicKey,
-    HYBRID_CIPHERTEXT_SIZE, HYBRID_PUBLIC_KEY_SIZE, HYBRID_SHARED_SECRET_SIZE,
+    encapsulate, HybridCiphertext, HybridKeyPair, HybridPublicKey, HYBRID_CIPHERTEXT_SIZE,
+    HYBRID_PUBLIC_KEY_SIZE, HYBRID_SHARED_SECRET_SIZE,
 };
 use quantum_shield_proxy::gateway::{
     BalancingStrategy, GatewayMetrics, GatewayOptions, LoadBalancer, QuantumGateway,
 };
 use quantum_shield_proxy::tls::{
-    build_client_config, build_server_config, generate_self_signed,
-    parse_certs_from_pem, parse_private_key_from_pem,
+    build_client_config, build_server_config, generate_self_signed, parse_certs_from_pem,
+    parse_private_key_from_pem,
 };
 
 #[test]
@@ -42,7 +42,8 @@ fn test_hybrid_kem_roundtrip() {
     // 2. Wire serialization format
     let pub_bytes = client_pub.to_bytes();
     assert_eq!(pub_bytes.len(), HYBRID_PUBLIC_KEY_SIZE);
-    let parsed_pub = HybridPublicKey::from_bytes(&pub_bytes).expect("Failed to deserialize public key");
+    let parsed_pub =
+        HybridPublicKey::from_bytes(&pub_bytes).expect("Failed to deserialize public key");
     assert_eq!(client_pub, parsed_pub);
 
     // 3. Server encapsulates
@@ -51,11 +52,14 @@ fn test_hybrid_kem_roundtrip() {
     // Ciphertext wire size check
     let ct_bytes = ciphertext.to_bytes();
     assert_eq!(ct_bytes.len(), HYBRID_CIPHERTEXT_SIZE);
-    let parsed_ct = HybridCiphertext::from_bytes(&ct_bytes).expect("Failed to deserialize ciphertext");
+    let parsed_ct =
+        HybridCiphertext::from_bytes(&ct_bytes).expect("Failed to deserialize ciphertext");
     assert_eq!(ciphertext, parsed_ct);
 
     // 4. Client decapsulates
-    let client_ss = client_kp.decapsulate(&parsed_ct).expect("Decapsulation failed");
+    let client_ss = client_kp
+        .decapsulate(&parsed_ct)
+        .expect("Decapsulation failed");
 
     // 5. Assert identical shared secret
     assert_eq!(server_ss.as_bytes().len(), HYBRID_SHARED_SECRET_SIZE);
@@ -72,13 +76,19 @@ fn test_dilithium_digital_signatures() {
 
     // Verification must succeed on original message
     let verify_res = dilithium::verify(&kp.public_key, payload, &sig);
-    assert!(verify_res.is_ok(), "Signature verification failed on legitimate message");
+    assert!(
+        verify_res.is_ok(),
+        "Signature verification failed on legitimate message"
+    );
 
     // Verification must fail on altered message
     let mut tampered = payload.to_vec();
     tampered[0] ^= 0xff;
     let tampered_res = dilithium::verify(&kp.public_key, &tampered, &sig);
-    assert!(tampered_res.is_err(), "Signature verification must fail on tampered message");
+    assert!(
+        tampered_res.is_err(),
+        "Signature verification must fail on tampered message"
+    );
 }
 
 #[tokio::test]
@@ -112,7 +122,10 @@ async fn test_tls13_pqc_handshake_and_exchange() {
 
         // Verify TLS 1.3 negotiated
         let (_, conn) = tls_stream.get_ref();
-        assert_eq!(conn.protocol_version(), Some(rustls::ProtocolVersion::TLSv1_3));
+        assert_eq!(
+            conn.protocol_version(),
+            Some(rustls::ProtocolVersion::TLSv1_3)
+        );
 
         // Read ping message
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -160,7 +173,10 @@ async fn test_gateway_reverse_proxy_and_header_injection() {
                     let service = service_fn(|req: Request<Incoming>| async move {
                         // Assert that QuantumShield injected security headers
                         assert_eq!(req.headers().get("X-Quantum-Shield").unwrap(), "secured");
-                        assert_eq!(req.headers().get("X-PQC-Key-Exchange").unwrap(), "X25519-MLKEM768");
+                        assert_eq!(
+                            req.headers().get("X-PQC-Key-Exchange").unwrap(),
+                            "X25519-MLKEM768"
+                        );
 
                         let body = "Backend Response: Quantum Protected";
                         let full = Full::new(Bytes::from(body))
@@ -170,7 +186,7 @@ async fn test_gateway_reverse_proxy_and_header_injection() {
                             Response::builder()
                                 .status(StatusCode::OK)
                                 .body(full)
-                                .unwrap()
+                                .unwrap(),
                         )
                     });
                     let _ = hyper::server::conn::http1::Builder::new()
@@ -240,7 +256,11 @@ async fn test_gateway_reverse_proxy_and_header_injection() {
     let req = Request::builder()
         .uri("/api/resource")
         .header("host", "localhost")
-        .body(Full::new(Bytes::from("hello")).map_err(|never| match never {}).boxed())
+        .body(
+            Full::new(Bytes::from("hello"))
+                .map_err(|never| match never {})
+                .boxed(),
+        )
         .unwrap();
 
     let resp = sender.send_request(req).await.unwrap();
@@ -248,14 +268,27 @@ async fn test_gateway_reverse_proxy_and_header_injection() {
 
     // Verify response headers
     assert_eq!(resp.headers().get("X-Quantum-Shield").unwrap(), "secured");
-    assert_eq!(resp.headers().get("X-PQC-Key-Exchange").unwrap(), "X25519-MLKEM768");
+    assert_eq!(
+        resp.headers().get("X-PQC-Key-Exchange").unwrap(),
+        "X25519-MLKEM768"
+    );
 
     let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
     assert_eq!(&body_bytes[..], b"Backend Response: Quantum Protected");
 
     // Verify Prometheus Metrics
-    assert!(metrics.requests_total.load(std::sync::atomic::Ordering::Relaxed) >= 1);
-    assert!(metrics.pqc_handshakes_total.load(std::sync::atomic::Ordering::Relaxed) >= 1);
+    assert!(
+        metrics
+            .requests_total
+            .load(std::sync::atomic::Ordering::Relaxed)
+            >= 1
+    );
+    assert!(
+        metrics
+            .pqc_handshakes_total
+            .load(std::sync::atomic::Ordering::Relaxed)
+            >= 1
+    );
 
     // Gracefully shut down gateway
     let _ = shutdown_tx.send(true);

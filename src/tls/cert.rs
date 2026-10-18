@@ -4,10 +4,10 @@
 //! loading PEM-encoded certificate chains and private keys, and configuring
 //! rustls certificate verifiers.
 
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -36,17 +36,22 @@ pub struct GeneratedCert {
 
 /// Generates a self-signed certificate and PKCS#8 private key for the given domain names
 pub fn generate_self_signed(domains: Vec<String>) -> Result<GeneratedCert, CertError> {
-    let mut params = rcgen::CertificateParams::new(domains)
-        .map_err(|e| CertError::Generation(e.to_string()))?;
+    let mut params =
+        rcgen::CertificateParams::new(domains).map_err(|e| CertError::Generation(e.to_string()))?;
 
     // Configure certificate metadata
-    params.distinguished_name.push(rcgen::DnType::OrganizationName, "QuantumShield Security Gateway");
-    params.distinguished_name.push(rcgen::DnType::CommonName, "QuantumShield PQC TLS Gateway");
+    params.distinguished_name.push(
+        rcgen::DnType::OrganizationName,
+        "QuantumShield Security Gateway",
+    );
+    params
+        .distinguished_name
+        .push(rcgen::DnType::CommonName, "QuantumShield PQC TLS Gateway");
 
-    let key_pair = rcgen::KeyPair::generate()
-        .map_err(|e| CertError::Generation(e.to_string()))?;
+    let key_pair = rcgen::KeyPair::generate().map_err(|e| CertError::Generation(e.to_string()))?;
 
-    let cert = params.self_signed(&key_pair)
+    let cert = params
+        .self_signed(&key_pair)
         .map_err(|e| CertError::Generation(e.to_string()))?;
 
     let cert_pem = cert.pem();

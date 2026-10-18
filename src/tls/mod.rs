@@ -6,14 +6,20 @@
 pub mod cert;
 pub mod provider;
 
-use std::sync::Arc;
+use rustls::client::ClientConfig;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use rustls::server::ServerConfig;
-use rustls::client::ClientConfig;
 use rustls::RootCertStore;
+use std::sync::Arc;
 
-pub use cert::{generate_self_signed, load_certs, load_private_key, parse_certs_from_pem, parse_private_key_from_pem, GeneratedCert};
-pub use provider::{install_default_provider, pqc_crypto_provider, strict_pqc_crypto_provider, PQC_KX_GROUP, X25519_MLKEM768_KX_GROUP};
+pub use cert::{
+    generate_self_signed, load_certs, load_private_key, parse_certs_from_pem,
+    parse_private_key_from_pem, GeneratedCert,
+};
+pub use provider::{
+    install_default_provider, pqc_crypto_provider, strict_pqc_crypto_provider, PQC_KX_GROUP,
+    X25519_MLKEM768_KX_GROUP,
+};
 
 /// Builds a production TLS 1.3 ServerConfig with Post-Quantum Cryptography enabled
 pub fn build_server_config(
@@ -34,9 +40,8 @@ pub fn build_server_config(
         .with_single_cert(cert_chain, private_key)?;
 
     // Configure ALPN (HTTP/2 and HTTP/1.1 negotiation)
-    config.alpn_protocols = alpn_protocols.unwrap_or_else(|| {
-        vec![b"h2".to_vec(), b"http/1.1".to_vec()]
-    });
+    config.alpn_protocols =
+        alpn_protocols.unwrap_or_else(|| vec![b"h2".to_vec(), b"http/1.1".to_vec()]);
 
     // Enforce TLS 1.3 minimum for post-quantum security
     config.ignore_client_order = true;
@@ -61,9 +66,8 @@ pub fn build_client_config(
         .with_root_certificates(root_store)
         .with_no_client_auth();
 
-    config.alpn_protocols = alpn_protocols.unwrap_or_else(|| {
-        vec![b"h2".to_vec(), b"http/1.1".to_vec()]
-    });
+    config.alpn_protocols =
+        alpn_protocols.unwrap_or_else(|| vec![b"h2".to_vec(), b"http/1.1".to_vec()]);
 
     Ok(Arc::new(config))
 }

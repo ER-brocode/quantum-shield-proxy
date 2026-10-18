@@ -3,10 +3,10 @@
 //! Supports loading YAML/JSON configurations, environment variable overrides,
 //! and sensible production defaults.
 
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -133,11 +133,14 @@ impl GatewayConfig {
     /// Validates the configuration values
     pub fn validate(&self) -> Result<(), ConfigError> {
         if self.backends.is_empty() {
-            return Err(ConfigError::Validation("At least one upstream backend must be specified".into()));
+            return Err(ConfigError::Validation(
+                "At least one upstream backend must be specified".into(),
+            ));
         }
         if !self.auto_generate_cert && (self.cert_path.is_none() || self.key_path.is_none()) {
             return Err(ConfigError::Validation(
-                "cert_path and key_path must be specified when auto_generate_cert is disabled".into()
+                "cert_path and key_path must be specified when auto_generate_cert is disabled"
+                    .into(),
             ));
         }
         Ok(())

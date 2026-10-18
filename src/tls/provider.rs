@@ -3,14 +3,14 @@
 //! Implements `rustls::crypto::SupportedKxGroup` and `rustls::crypto::ActiveKeyExchange`
 //! for the hybrid X25519 + ML-KEM-768 key exchange group (`NamedGroup::X25519MLKEM768`, 0x11ec).
 
+use rustls::crypto::{
+    ActiveKeyExchange, CompletedKeyExchange, CryptoProvider, SharedSecret, SupportedKxGroup,
+};
+use rustls::{Error as RustlsError, NamedGroup};
 use std::fmt::Debug;
 use std::sync::Arc;
-use rustls::crypto::{ActiveKeyExchange, CompletedKeyExchange, CryptoProvider, SharedSecret, SupportedKxGroup};
-use rustls::{Error as RustlsError, NamedGroup};
 
-use crate::crypto::hybrid_kem::{
-    encapsulate, HybridCiphertext, HybridKeyPair, HybridPublicKey,
-};
+use crate::crypto::hybrid_kem::{encapsulate, HybridCiphertext, HybridKeyPair, HybridPublicKey};
 
 /// The standard IETF codepoint for hybrid X25519 + ML-KEM-768 (draft-ietf-tls-hybrid-design)
 pub const PQC_KX_GROUP: NamedGroup = NamedGroup::X25519MLKEM768;
@@ -36,8 +36,9 @@ impl SupportedKxGroup for X25519MlKem768KxGroup {
     /// Server-side start & complete: given client's hybrid public key share,
     /// encapsulates post-quantum shared secret and returns server's ciphertext share
     fn start_and_complete(&self, peer_pub_key: &[u8]) -> Result<CompletedKeyExchange, RustlsError> {
-        let client_pub = HybridPublicKey::from_bytes(peer_pub_key)
-            .map_err(|e| RustlsError::General(format!("Invalid client PQC hybrid public key: {}", e)))?;
+        let client_pub = HybridPublicKey::from_bytes(peer_pub_key).map_err(|e| {
+            RustlsError::General(format!("Invalid client PQC hybrid public key: {}", e))
+        })?;
 
         let (ciphertext, shared_secret) = encapsulate(&client_pub)
             .map_err(|e| RustlsError::General(format!("Server PQC encapsulation failed: {}", e)))?;
@@ -74,13 +75,16 @@ impl Debug for ActiveHybridKeyExchange {
 impl ActiveKeyExchange for ActiveHybridKeyExchange {
     /// Client-side complete: receives server's hybrid ciphertext and decapsulates the shared secret
     fn complete(mut self: Box<Self>, peer_pub_key: &[u8]) -> Result<SharedSecret, RustlsError> {
-        let keypair = self.keypair.take()
+        let keypair = self
+            .keypair
+            .take()
             .ok_or_else(|| RustlsError::General("Hybrid keypair already consumed".into()))?;
 
         let server_ct = HybridCiphertext::from_bytes(peer_pub_key)
             .map_err(|e| RustlsError::General(format!("Invalid server PQC ciphertext: {}", e)))?;
 
-        let shared_secret = keypair.decapsulate(&server_ct)
+        let shared_secret = keypair
+            .decapsulate(&server_ct)
             .map_err(|e| RustlsError::General(format!("Client PQC decapsulation failed: {}", e)))?;
 
         Ok(SharedSecret::from(shared_secret.as_bytes().as_slice()))

@@ -69,10 +69,8 @@ impl LoadBalancer {
 
     /// Selects an optimal healthy backend based on the chosen strategy
     pub fn select_backend(&self) -> Option<Backend> {
-        let healthy_backends: Vec<&Backend> = self.backends
-            .iter()
-            .filter(|b| b.is_healthy())
-            .collect();
+        let healthy_backends: Vec<&Backend> =
+            self.backends.iter().filter(|b| b.is_healthy()).collect();
 
         if healthy_backends.is_empty() {
             // If all marked unhealthy, fallback to any backend to avoid hard blackhole
@@ -95,11 +93,7 @@ impl LoadBalancer {
     }
 
     /// Starts a background task performing periodic TCP health probes on all backends
-    pub fn spawn_health_checker(
-        self: Arc<Self>,
-        interval: Duration,
-        probe_timeout: Duration,
-    ) {
+    pub fn spawn_health_checker(self: Arc<Self>, interval: Duration, probe_timeout: Duration) {
         tokio::spawn(async move {
             let mut ticker = tokio::time::interval(interval);
             loop {
@@ -128,7 +122,8 @@ impl LoadBalancer {
                         let probe_result = tokio::time::timeout(
                             probe_timeout,
                             tokio::net::TcpStream::connect(&host_port),
-                        ).await;
+                        )
+                        .await;
 
                         match probe_result {
                             Ok(Ok(_stream)) => {

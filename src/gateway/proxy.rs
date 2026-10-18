@@ -70,7 +70,10 @@ impl QuantumGateway {
     }
 
     /// Runs the gateway accept loop until shutdown signal is received
-    pub async fn run(self: Arc<Self>, mut shutdown_rx: tokio::sync::watch::Receiver<bool>) -> Result<(), anyhow::Error> {
+    pub async fn run(
+        self: Arc<Self>,
+        mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
+    ) -> Result<(), anyhow::Error> {
         let listener = TcpListener::bind(self.listen_addr).await?;
         info!(addr = %self.listen_addr, "QuantumShield TLS 1.3 Gateway listening");
 
@@ -127,7 +130,11 @@ impl QuantumGateway {
         let service = service_fn(move |req: Request<Incoming>| {
             let gateway = gateway.clone();
             async move {
-                Ok::<_, Infallible>(gateway.dispatch_request(req, client_addr, handshake_duration_us).await)
+                Ok::<_, Infallible>(
+                    gateway
+                        .dispatch_request(req, client_addr, handshake_duration_us)
+                        .await,
+                )
             }
         });
 
@@ -178,7 +185,8 @@ impl QuantumGateway {
         }
 
         // Proxy to Upstream Backend
-        self.proxy_to_upstream(req, client_addr, handshake_duration_us).await
+        self.proxy_to_upstream(req, client_addr, handshake_duration_us)
+            .await
     }
 
     /// Proxies the HTTP request to an upstream backend with security header injection
@@ -194,7 +202,9 @@ impl QuantumGateway {
                 self.metrics.record_backend_error();
                 return Response::builder()
                     .status(StatusCode::SERVICE_UNAVAILABLE)
-                    .body(full_box_body("503 Service Unavailable: No healthy backends"))
+                    .body(full_box_body(
+                        "503 Service Unavailable: No healthy backends",
+                    ))
                     .unwrap();
             }
         };
@@ -211,7 +221,9 @@ impl QuantumGateway {
                 self.metrics.record_backend_error();
                 return Response::builder()
                     .status(StatusCode::BAD_REQUEST)
-                    .body(full_box_body("400 Bad Request: Failed to read request body"))
+                    .body(full_box_body(
+                        "400 Bad Request: Failed to read request body",
+                    ))
                     .unwrap();
             }
         };
@@ -247,7 +259,10 @@ impl QuantumGateway {
                 error!(target = %host_port, error = %e, "HTTP client handshake with upstream failed");
                 return Response::builder()
                     .status(StatusCode::BAD_GATEWAY)
-                    .body(full_box_body(format!("502 Bad Gateway: upstream handshake failed: {}", e)))
+                    .body(full_box_body(format!(
+                        "502 Bad Gateway: upstream handshake failed: {}",
+                        e
+                    )))
                     .unwrap();
             }
         };
@@ -277,7 +292,10 @@ impl QuantumGateway {
                 .header("X-Quantum-Shield", "secured")
                 .header("X-PQC-Key-Exchange", "X25519-MLKEM768")
                 .header("X-PQC-Security-Level", "NIST-Level-3 (192-bit quantum)")
-                .header("X-PQC-Handshake-Duration-Us", handshake_duration_us.to_string())
+                .header(
+                    "X-PQC-Handshake-Duration-Us",
+                    handshake_duration_us.to_string(),
+                )
                 .header("X-Forwarded-Proto", "https")
                 .header("X-Forwarded-For", client_addr.ip().to_string());
         }
@@ -305,8 +323,14 @@ impl QuantumGateway {
                     .header("Server", &self.options.server_name)
                     .header("X-Quantum-Shield", "secured")
                     .header("X-PQC-Key-Exchange", "X25519-MLKEM768")
-                    .header("X-PQC-Handshake-Duration-Us", handshake_duration_us.to_string())
-                    .header("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+                    .header(
+                        "X-PQC-Handshake-Duration-Us",
+                        handshake_duration_us.to_string(),
+                    )
+                    .header(
+                        "Strict-Transport-Security",
+                        "max-age=63072000; includeSubDomains; preload",
+                    );
 
                 client_resp.body(full_box_body(resp_bytes)).unwrap()
             }
@@ -314,7 +338,10 @@ impl QuantumGateway {
                 self.metrics.record_backend_error();
                 Response::builder()
                     .status(StatusCode::BAD_GATEWAY)
-                    .body(full_box_body(format!("502 Bad Gateway: upstream read error: {}", e)))
+                    .body(full_box_body(format!(
+                        "502 Bad Gateway: upstream read error: {}",
+                        e
+                    )))
                     .unwrap()
             }
         };

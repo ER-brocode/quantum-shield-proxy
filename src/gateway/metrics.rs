@@ -26,12 +26,14 @@ impl GatewayMetrics {
 
     pub fn record_pqc_handshake(&self, duration: Duration) {
         self.pqc_handshakes_total.fetch_add(1, Ordering::Relaxed);
-        self.total_handshake_duration_us.fetch_add(duration.as_micros() as u64, Ordering::Relaxed);
+        self.total_handshake_duration_us
+            .fetch_add(duration.as_micros() as u64, Ordering::Relaxed);
     }
 
     pub fn record_legacy_handshake(&self, duration: Duration) {
         self.legacy_handshakes_total.fetch_add(1, Ordering::Relaxed);
-        self.total_handshake_duration_us.fetch_add(duration.as_micros() as u64, Ordering::Relaxed);
+        self.total_handshake_duration_us
+            .fetch_add(duration.as_micros() as u64, Ordering::Relaxed);
     }
 
     pub fn record_handshake_failure(&self) {

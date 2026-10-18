@@ -5,14 +5,14 @@
 //! the hybrid X25519 + ML-KEM-768 key exchange mechanism conforming to
 //! `draft-ietf-tls-hybrid-design` and `draft-kwiatkowski-tls-ecdhe-mlkem`.
 
-pub mod hybrid_kem;
 pub mod dilithium;
+pub mod hybrid_kem;
 
-pub use hybrid_kem::{
-    HybridCiphertext, HybridKeyPair, HybridPublicKey, HybridSharedSecret,
-    HYBRID_CIPHERTEXT_SIZE, HYBRID_PUBLIC_KEY_SIZE, HYBRID_SHARED_SECRET_SIZE,
-};
 pub use dilithium::{
     DilithiumKeyPair, DilithiumPublicKey, DilithiumSecretKey, DilithiumSignature,
     DILITHIUM_PUBLIC_KEY_SIZE, DILITHIUM_SIGNATURE_SIZE,
+};
+pub use hybrid_kem::{
+    HybridCiphertext, HybridKeyPair, HybridPublicKey, HybridSharedSecret, HYBRID_CIPHERTEXT_SIZE,
+    HYBRID_PUBLIC_KEY_SIZE, HYBRID_SHARED_SECRET_SIZE,
 };

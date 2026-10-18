@@ -20,8 +20,8 @@ use quantum_shield_proxy::gateway::{
     BalancingStrategy, GatewayMetrics, GatewayOptions, LoadBalancer, QuantumGateway,
 };
 use quantum_shield_proxy::tls::{
-    build_server_config, generate_self_signed, load_certs, load_private_key,
-    parse_certs_from_pem, parse_private_key_from_pem,
+    build_server_config, generate_self_signed, load_certs, load_private_key, parse_certs_from_pem,
+    parse_private_key_from_pem,
 };
 
 #[derive(Parser)]
@@ -223,7 +223,10 @@ async fn run_gateway(cfg: GatewayConfig) -> Result<(), Box<dyn std::error::Error
 }
 
 fn run_benchmark(iterations: usize) {
-    info!(iterations, "Starting Post-Quantum Cryptography performance benchmark");
+    info!(
+        iterations,
+        "Starting Post-Quantum Cryptography performance benchmark"
+    );
 
     // Benchmark ML-KEM-768 Keygen
     let start = Instant::now();
@@ -265,9 +268,19 @@ fn run_benchmark(iterations: usize) {
     println!("-------------------------------------------------------");
     println!("Operation       | Latency (us/op) | Throughput (ops/sec)");
     println!("----------------+-----------------+--------------------");
-    println!("Key Generation  | {:>15.2} | {:>18.1}", keygen_us_per_op, keygen_ops_sec);
-    println!("Encapsulation   | {:>15.2} | {:>18.1}", encaps_us_per_op, encaps_ops_sec);
-    println!("Decapsulation   | {:>15.2} | {:>18.1}", decaps_us_per_op, iterations as f64 / elapsed.as_secs_f64());
+    println!(
+        "Key Generation  | {:>15.2} | {:>18.1}",
+        keygen_us_per_op, keygen_ops_sec
+    );
+    println!(
+        "Encapsulation   | {:>15.2} | {:>18.1}",
+        encaps_us_per_op, encaps_ops_sec
+    );
+    println!(
+        "Decapsulation   | {:>15.2} | {:>18.1}",
+        decaps_us_per_op,
+        iterations as f64 / elapsed.as_secs_f64()
+    );
     println!("=======================================================\n");
 }
 

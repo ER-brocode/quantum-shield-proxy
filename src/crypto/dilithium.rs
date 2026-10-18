@@ -161,13 +161,19 @@ pub fn verify(
     signature: &DilithiumSignature,
 ) -> Result<(), DilithiumError> {
     use ml_dsa::signature::Verifier;
-    let vk = ml_dsa::VerifyingKey::<MlDsa65>::from_encoded_point(
-        &ml_dsa::EncodedPoint::<ml_dsa::VerifyingKey<MlDsa65>>::from_bytes(public_key.as_bytes().into())
-    ).map_err(|_| DilithiumError::VerificationFailed)?;
+    let vk = ml_dsa::VerifyingKey::<MlDsa65>::from_encoded_point(&ml_dsa::EncodedPoint::<
+        ml_dsa::VerifyingKey<MlDsa65>,
+    >::from_bytes(
+        public_key.as_bytes().into()
+    ))
+    .map_err(|_| DilithiumError::VerificationFailed)?;
 
-    let sig = ml_dsa::Signature::<MlDsa65>::from_encoded_point(
-        &ml_dsa::EncodedPoint::<ml_dsa::Signature<MlDsa65>>::from_bytes(signature.as_bytes().into())
-    ).map_err(|_| DilithiumError::VerificationFailed)?;
+    let sig = ml_dsa::Signature::<MlDsa65>::from_encoded_point(&ml_dsa::EncodedPoint::<
+        ml_dsa::Signature<MlDsa65>,
+    >::from_bytes(
+        signature.as_bytes().into()
+    ))
+    .map_err(|_| DilithiumError::VerificationFailed)?;
 
     vk.verify(message, &sig)
         .map_err(|_| DilithiumError::VerificationFailed)
