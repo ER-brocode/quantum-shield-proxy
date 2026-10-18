@@ -178,16 +178,9 @@ async fn test_gateway_reverse_proxy_and_header_injection() {
                             "X25519-MLKEM768"
                         );
 
-                        let body = "Backend Response: Quantum Protected";
-                        let full = Full::new(Bytes::from(body))
-                            .map_err(|never| match never {})
-                            .boxed();
-                        Ok::<_, std::convert::Infallible>(
-                            Response::builder()
-                                .status(StatusCode::OK)
-                                .body(full)
-                                .unwrap(),
-                        )
+                        let body_bytes =
+                            Full::new(Bytes::from("Backend Response: Quantum Protected"));
+                        Ok::<_, std::convert::Infallible>(Response::new(body_bytes))
                     });
                     let _ = hyper::server::conn::http1::Builder::new()
                         .serve_connection(io, service)
@@ -256,11 +249,7 @@ async fn test_gateway_reverse_proxy_and_header_injection() {
     let req = Request::builder()
         .uri("/api/resource")
         .header("host", "localhost")
-        .body(
-            Full::new(Bytes::from("hello"))
-                .map_err(|never| match never {})
-                .boxed(),
-        )
+        .body(Full::new(Bytes::from("hello")))
         .unwrap();
 
     let resp = sender.send_request(req).await.unwrap();
