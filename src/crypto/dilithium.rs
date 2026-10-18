@@ -130,7 +130,7 @@ impl DilithiumKeyPair {
         let mut seed = [0u8; DILITHIUM_SECRET_KEY_SIZE];
         rng.fill_bytes(&mut seed);
 
-        let seed_arr = ml_dsa::hybrid_array::Array::from(seed);
+        let seed_arr = hybrid_array::Array::from(seed);
         let signing_key = SigningKey::<MlDsa65>::from_seed(&seed_arr);
         let verifying_key: VerifyingKey<MlDsa65> = signing_key.verifying_key();
         let enc_vk = verifying_key.encode();
