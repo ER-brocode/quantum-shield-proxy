@@ -186,7 +186,7 @@ pub struct HybridKeyPair {
 impl HybridKeyPair {
     /// Generates a fresh hybrid keypair using OS cryptographically secure random number generator
     pub fn generate() -> Self {
-        let mut rng = OsRng;
+        let rng = OsRng;
         let x25519_secret = EphemeralSecret::random_from_rng(rng);
         let x25519_public = X25519PublicKey::from(&x25519_secret);
 
@@ -242,7 +242,7 @@ impl HybridKeyPair {
 pub fn encapsulate(
     peer_public: &HybridPublicKey,
 ) -> Result<(HybridCiphertext, HybridSharedSecret), HybridCryptoError> {
-    let mut rng = OsRng;
+    let rng = OsRng;
 
     // 1. Classical X25519 ephemeral key generation and DH
     let server_secret = EphemeralSecret::random_from_rng(rng);

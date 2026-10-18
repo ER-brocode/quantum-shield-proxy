@@ -249,7 +249,6 @@ fn run_benchmark(iterations: usize) {
     let encaps_us_per_op = elapsed.as_micros() as f64 / iterations as f64;
 
     // Benchmark Decapsulation
-    let (ct, _) = encapsulate(&pk).unwrap();
     let start = Instant::now();
     for _ in 0..iterations {
         // regenerate keypair clone to decapsulate repeatedly
