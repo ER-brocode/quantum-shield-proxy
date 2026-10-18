@@ -66,7 +66,7 @@ pub fn load_certs(path: &Path) -> Result<Vec<CertificateDer<'static>>, CertError
     let mut reader = BufReader::new(certfile);
     let certs = rustls_pemfile::certs(&mut reader)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| CertError::Io(e))?;
+        .map_err(CertError::Io)?;
 
     if certs.is_empty() {
         return Err(CertError::NoCertificatesFound(path.display().to_string()));
@@ -98,7 +98,7 @@ pub fn parse_certs_from_pem(pem: &str) -> Result<Vec<CertificateDer<'static>>, C
     let mut reader = BufReader::new(pem.as_bytes());
     let certs = rustls_pemfile::certs(&mut reader)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| CertError::Io(e))?;
+        .map_err(CertError::Io)?;
 
     if certs.is_empty() {
         return Err(CertError::NoCertificatesFound("in-memory PEM".into()));

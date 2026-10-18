@@ -187,7 +187,7 @@ impl HybridKeyPair {
     /// Generates a fresh hybrid keypair using OS cryptographically secure random number generator
     pub fn generate() -> Self {
         let mut rng = OsRng;
-        let x25519_secret = EphemeralSecret::random_from_rng(&mut rng);
+        let x25519_secret = EphemeralSecret::random_from_rng(rng);
         let x25519_public = X25519PublicKey::from(&x25519_secret);
 
         let (dk, ek) = MlKem768::generate_keypair();
@@ -245,7 +245,7 @@ pub fn encapsulate(
     let mut rng = OsRng;
 
     // 1. Classical X25519 ephemeral key generation and DH
-    let server_secret = EphemeralSecret::random_from_rng(&mut rng);
+    let server_secret = EphemeralSecret::random_from_rng(rng);
     let server_pub = X25519PublicKey::from(&server_secret);
     let client_x25519 = X25519PublicKey::from(peer_public.x25519_public);
     let classical_ss = server_secret.diffie_hellman(&client_x25519);
