@@ -11,8 +11,8 @@ categories = ["cryptography", "network-programming"]
 
 [dependencies]
 # Post-Quantum Cryptography (NIST FIPS 203 & 204)
-ml-kem = "0.3.3"
-ml-dsa = "0.1.1"
+ml-kem = { version = "0.3.3", features = ["getrandom", "zeroize"] }
+ml-dsa = { version = "0.1.1", features = ["getrandom", "zeroize", "rand_core"] }
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 sha2 = "0.10"
 hkdf = "0.12"

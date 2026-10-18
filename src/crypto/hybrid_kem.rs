@@ -8,10 +8,11 @@
 //! of the underlying primitives remains unbroken ("dual security").
 
 use hkdf::Hkdf;
-use ml_kem::kem::{Decapsulate, Encapsulate};
-use ml_kem::{Ciphertext, Encoded, MlKem768, MlKem768Params, SharedSecret};
+use ml_kem::kem::{Decapsulate, Encapsulate, Kem, KeyExport, TryKeyInit};
+use ml_kem::ml_kem_768::{Ciphertext, DecapsulationKey, EncapsulationKey};
+use ml_kem::MlKem768;
 use rand::rngs::OsRng;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
@@ -169,7 +170,6 @@ impl std::fmt::Debug for HybridSharedSecret {
 
 impl Drop for HybridSharedSecret {
     fn drop(&mut self) {
-        // Zeroize memory upon drop
         for b in self.0.iter_mut() {
             *b = 0;
         }
@@ -180,7 +180,7 @@ impl Drop for HybridSharedSecret {
 pub struct HybridKeyPair {
     x25519_secret: EphemeralSecret,
     pub public_key: HybridPublicKey,
-    mlkem_decaps_key: <MlKem768 as ml_kem::KemCore>::DecapsulationKey,
+    mlkem_decaps_key: DecapsulationKey,
 }
 
 impl HybridKeyPair {
@@ -190,8 +190,8 @@ impl HybridKeyPair {
         let x25519_secret = EphemeralSecret::random_from_rng(&mut rng);
         let x25519_public = X25519PublicKey::from(&x25519_secret);
 
-        let (dk, ek) = ml_kem::MlKem768::generate(&mut rng);
-        let ek_bytes = ek.as_bytes();
+        let (dk, ek) = MlKem768::generate_keypair();
+        let ek_bytes = ek.to_bytes();
 
         let mut mlkem_pub = [0u8; MLKEM768_ENCAPS_KEY_SIZE];
         mlkem_pub.copy_from_slice(ek_bytes.as_slice());
@@ -223,9 +223,8 @@ impl HybridKeyPair {
         }
 
         // 2. ML-KEM-768 Decapsulation (FIPS 203)
-        let ct_encoded =
-            Ciphertext::<MlKem768Params>::from_bytes(&ciphertext.mlkem_ciphertext.into());
-        let pq_ss = self.mlkem_decaps_key.decapsulate(&ct_encoded);
+        let ct = Ciphertext::clone_from_slice(&ciphertext.mlkem_ciphertext);
+        let pq_ss = self.mlkem_decaps_key.decapsulate(&ct);
 
         // 3. Derive combined hybrid shared secret via HKDF-SHA256
         let final_ss = derive_hybrid_secret(classical_bytes, pq_ss.as_slice())?;
@@ -253,17 +252,13 @@ pub fn encapsulate(
     }
 
     // 2. ML-KEM-768 Encapsulation (FIPS 203)
-    let ek_encoded = Encoded::<ml_kem::EncapsulationKey<MlKem768Params>>::from_bytes(
-        &peer_public.mlkem_public.into(),
-    );
-    let ek = ml_kem::EncapsulationKey::<MlKem768Params>::from_bytes(&ek_encoded);
-
-    let (ct, pq_ss) = ek
-        .encapsulate(&mut rng)
+    let ek = EncapsulationKey::new_from_slice(&peer_public.mlkem_public)
         .map_err(|_| HybridCryptoError::EncapsulationFailed)?;
 
+    let (ct, pq_ss) = ek.encapsulate();
+
     let mut mlkem_ct_bytes = [0u8; MLKEM768_CIPHERTEXT_SIZE];
-    mlkem_ct_bytes.copy_from_slice(ct.as_bytes().as_slice());
+    mlkem_ct_bytes.copy_from_slice(ct.as_slice());
 
     let ciphertext = HybridCiphertext::new(*server_pub.as_bytes(), mlkem_ct_bytes);
 
@@ -282,7 +277,7 @@ fn derive_hybrid_secret(
     ikm.extend_from_slice(classical);
     ikm.extend_from_slice(pq);
 
-    let salt = sha2::Sha256::digest(b"X25519Kyber768Draft00");
+    let salt = Sha256::digest(b"X25519Kyber768Draft00");
     let hk = Hkdf::<Sha256>::new(Some(&salt), &ikm);
 
     let mut okm = [0u8; HYBRID_SHARED_SECRET_SIZE];
@@ -292,40 +287,32 @@ fn derive_hybrid_secret(
     Ok(okm)
 }
 
-use sha2::Digest;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_hybrid_kem_roundtrip() {
-        // Client generates keypair
         let client_keypair = HybridKeyPair::generate();
         let client_pub = client_keypair.public_key.clone();
 
-        // Wire serialization check
         let pub_bytes = client_pub.to_bytes();
         assert_eq!(pub_bytes.len(), HYBRID_PUBLIC_KEY_SIZE);
         let parsed_pub = HybridPublicKey::from_bytes(&pub_bytes).unwrap();
         assert_eq!(client_pub, parsed_pub);
 
-        // Server encapsulates
         let (ciphertext, server_ss) =
             encapsulate(&parsed_pub).expect("Encapsulation should succeed");
 
-        // Wire ciphertext serialization check
         let ct_bytes = ciphertext.to_bytes();
         assert_eq!(ct_bytes.len(), HYBRID_CIPHERTEXT_SIZE);
         let parsed_ct = HybridCiphertext::from_bytes(&ct_bytes).unwrap();
         assert_eq!(ciphertext, parsed_ct);
 
-        // Client decapsulates
         let client_ss = client_keypair
             .decapsulate(&parsed_ct)
             .expect("Decapsulation should succeed");
 
-        // Shared secrets must match identically
         assert_eq!(server_ss.as_bytes(), client_ss.as_bytes());
         assert_eq!(client_ss.as_bytes().len(), HYBRID_SHARED_SECRET_SIZE);
     }

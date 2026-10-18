@@ -3,16 +3,17 @@
 //! Provides post-quantum digital signature generation and verification for
 //! quantum-resistant certificate chains, mutual TLS authentication, and origin verification.
 
-use ml_dsa::KeyExport;
-use ml_dsa::MlDsa65;
+use ml_dsa::signature::{Keypair, Signer, Verifier};
+use ml_dsa::{EncodedSignature, EncodedVerifyingKey, MlDsa65, Signature, SigningKey, VerifyingKey};
 use rand::rngs::OsRng;
+use rand::RngCore;
 use thiserror::Error;
 
 /// ML-DSA-65 public key size (1952 bytes)
 pub const DILITHIUM_PUBLIC_KEY_SIZE: usize = 1952;
 
-/// ML-DSA-65 secret key size (4032 bytes)
-pub const DILITHIUM_SECRET_KEY_SIZE: usize = 4032;
+/// ML-DSA-65 secret key seed size (32 bytes)
+pub const DILITHIUM_SECRET_KEY_SIZE: usize = 32;
 
 /// ML-DSA-65 signature size (3309 bytes)
 pub const DILITHIUM_SIGNATURE_SIZE: usize = 3309;
@@ -59,10 +60,10 @@ impl DilithiumPublicKey {
     }
 }
 
-/// ML-DSA-65 secret signing key
+/// ML-DSA-65 secret signing key seed
 #[derive(Clone)]
 pub struct DilithiumSecretKey {
-    bytes: Vec<u8>,
+    bytes: [u8; DILITHIUM_SECRET_KEY_SIZE],
 }
 
 impl DilithiumSecretKey {
@@ -73,12 +74,12 @@ impl DilithiumSecretKey {
                 actual: slice.len(),
             });
         }
-        Ok(Self {
-            bytes: slice.to_vec(),
-        })
+        let mut bytes = [0u8; DILITHIUM_SECRET_KEY_SIZE];
+        bytes.copy_from_slice(slice);
+        Ok(Self { bytes })
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8; DILITHIUM_SECRET_KEY_SIZE] {
         &self.bytes
     }
 }
@@ -119,37 +120,35 @@ impl DilithiumSignature {
 pub struct DilithiumKeyPair {
     pub public_key: DilithiumPublicKey,
     pub secret_key: DilithiumSecretKey,
-    inner_signing_key: ml_dsa::SigningKey<MlDsa65>,
+    inner_signing_key: SigningKey<MlDsa65>,
 }
 
 impl DilithiumKeyPair {
-    /// Generates a fresh ML-DSA-65 keypair
+    /// Generates a fresh ML-DSA-65 keypair from OS entropy
     pub fn generate() -> Result<Self, DilithiumError> {
         let mut rng = OsRng;
-        let signing_key = ml_dsa::SigningKey::<MlDsa65>::generate(&mut rng);
-        let verifying_key = signing_key.verifying_key();
+        let mut seed = [0u8; DILITHIUM_SECRET_KEY_SIZE];
+        rng.fill_bytes(&mut seed);
 
-        let pk_bytes = verifying_key.to_encoded_point();
-        let sk_bytes = signing_key.to_encoded_point();
+        let signing_key = SigningKey::<MlDsa65>::from_seed(&seed);
+        let verifying_key: VerifyingKey<MlDsa65> = signing_key.verifying_key();
+        let enc_vk = verifying_key.encode();
 
         Ok(Self {
             public_key: DilithiumPublicKey {
-                bytes: pk_bytes.as_slice().to_vec(),
+                bytes: enc_vk.as_slice().to_vec(),
             },
-            secret_key: DilithiumSecretKey {
-                bytes: sk_bytes.as_slice().to_vec(),
-            },
+            secret_key: DilithiumSecretKey { bytes: seed },
             inner_signing_key: signing_key,
         })
     }
 
     /// Signs a message using the ML-DSA-65 secret key
     pub fn sign(&self, message: &[u8]) -> DilithiumSignature {
-        let mut rng = OsRng;
-        use ml_dsa::signature::RandomizedSigner;
-        let sig = self.inner_signing_key.sign_with_rng(&mut rng, message);
+        let sig: Signature<MlDsa65> = self.inner_signing_key.sign(message);
+        let enc_sig = sig.encode();
         DilithiumSignature {
-            bytes: sig.to_encoded_point().as_slice().to_vec(),
+            bytes: enc_sig.as_slice().to_vec(),
         }
     }
 }
@@ -160,20 +159,18 @@ pub fn verify(
     message: &[u8],
     signature: &DilithiumSignature,
 ) -> Result<(), DilithiumError> {
-    use ml_dsa::signature::Verifier;
-    let vk = ml_dsa::VerifyingKey::<MlDsa65>::from_encoded_point(&ml_dsa::EncodedPoint::<
-        ml_dsa::VerifyingKey<MlDsa65>,
-    >::from_bytes(
-        public_key.as_bytes().into()
-    ))
-    .map_err(|_| DilithiumError::VerificationFailed)?;
+    if public_key.as_bytes().len() != DILITHIUM_PUBLIC_KEY_SIZE {
+        return Err(DilithiumError::InvalidPublicKeyLength {
+            expected: DILITHIUM_PUBLIC_KEY_SIZE,
+            actual: public_key.as_bytes().len(),
+        });
+    }
 
-    let sig = ml_dsa::Signature::<MlDsa65>::from_encoded_point(&ml_dsa::EncodedPoint::<
-        ml_dsa::Signature<MlDsa65>,
-    >::from_bytes(
-        signature.as_bytes().into()
-    ))
-    .map_err(|_| DilithiumError::VerificationFailed)?;
+    let enc_vk = EncodedVerifyingKey::<MlDsa65>::clone_from_slice(public_key.as_bytes());
+    let vk = VerifyingKey::<MlDsa65>::decode(&enc_vk);
+
+    let enc_sig = EncodedSignature::<MlDsa65>::clone_from_slice(signature.as_bytes());
+    let sig = Signature::<MlDsa65>::decode(&enc_sig).ok_or(DilithiumError::VerificationFailed)?;
 
     vk.verify(message, &sig)
         .map_err(|_| DilithiumError::VerificationFailed)
@@ -191,11 +188,9 @@ mod tests {
         let sig = keypair.sign(msg);
         assert_eq!(sig.as_bytes().len(), DILITHIUM_SIGNATURE_SIZE);
 
-        // Verify valid signature
         let verify_res = verify(&keypair.public_key, msg, &sig);
         assert!(verify_res.is_ok());
 
-        // Verify tampered message fails
         let tampered_msg = b"Tampered message content";
         let tampered_res = verify(&keypair.public_key, tampered_msg, &sig);
         assert!(tampered_res.is_err());
